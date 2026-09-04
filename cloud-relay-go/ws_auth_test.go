@@ -50,6 +50,9 @@ func TestServeBrowserAcceptsSignedSubprotocolToken(t *testing.T) {
 		t.Fatalf("signed subprotocol token should allow websocket upgrade: %v", err)
 	}
 	defer conn.Close()
+	if conn.Subprotocol() != "codeharbor-v1."+token {
+		t.Fatalf("selected websocket subprotocol = %q, want codeharbor-v1 token", conn.Subprotocol())
+	}
 	var ready map[string]any
 	if err := conn.ReadJSON(&ready); err != nil {
 		t.Fatalf("read cloud-ready: %v", err)

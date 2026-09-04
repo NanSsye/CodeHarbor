@@ -138,7 +138,7 @@ func (r *relay) serveBrowser(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	c, err := upgrader.Upgrade(w, req, nil)
+	c, err := upgrader.Upgrade(w, req, websocketResponseHeaders(req))
 	if err != nil {
 		return
 	}
@@ -168,6 +168,21 @@ func (r *relay) serveBrowser(w http.ResponseWriter, req *http.Request) {
 	defer r.remove(p)
 	p.sendJSON(map[string]any{"type": "cloud-ready", "payload": map[string]any{"protocolVersion": "codeharbor.gateway.v1"}})
 	r.readBrowser(p)
+}
+
+// websocketResponseHeaders selects the authenticated CodeHarbor subprotocol
+// so clients that offered it can complete the WebSocket negotiation. The
+// token itself is validated by browserPrincipal before this function is used.
+func websocketResponseHeaders(req *http.Request) http.Header {
+	for _, raw := range strings.Split(req.Header.Get("Sec-WebSocket-Protocol"), ",") {
+		protocol := strings.TrimSpace(raw)
+		if strings.HasPrefix(protocol, "codeharbor-v1.") {
+			header := make(http.Header)
+			header.Set("Sec-WebSocket-Protocol", protocol)
+			return header
+		}
+	}
+	return nil
 }
 
 // authorizedBrowserWS accepts the signed session token issued by the
