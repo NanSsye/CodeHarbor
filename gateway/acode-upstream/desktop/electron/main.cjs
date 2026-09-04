@@ -355,7 +355,7 @@ ipcMain.handle("desktop:save-settings", async (_event, input) => {
   saveSettingsFile();
   appendLog("配置已保存，正在启动 Gateway…");
   const state = await startGateway();
-  if (settings.relayUsername && unprotect(settings.relayPassword)) await openWorkspace();
+  if (settings.relayUsername && unprotect(settings.relayPassword)) await authenticateRelay();
   return state;
 });
 ipcMain.handle("desktop:open-workspace", () => openWorkspace());
@@ -372,7 +372,7 @@ app.whenReady().then(async () => {
   if (currentGatewayPassword()) {
     await startGateway();
     mainWindow?.webContents.send("desktop:state", getState());
-    if (settings.relayUsername && unprotect(settings.relayPassword)) await openWorkspace();
+    if (settings.relayUsername && unprotect(settings.relayPassword)) await authenticateRelay();
   }
   app.on("activate", () => { if (!mainWindow) createWindow(); });
 });
