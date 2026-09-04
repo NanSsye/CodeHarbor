@@ -175,6 +175,7 @@ export class RelayClient extends EventEmitter {
   private identity = readIdentity();
   private sessionSyncPromise: Promise<void> | null = null;
   private sessionSyncSocket: WebSocket | null = null;
+  private sessionSyncAgain = false;
   private started = false;
   private connecting = false;
   private revoked = false;
@@ -209,8 +210,18 @@ export class RelayClient extends EventEmitter {
   }
 
   /** Push the current authoritative session metadata without waiting for a reconnect. */
-  syncSessionsNow() {
-    return this.syncSessions();
+  syncSessionsNow(): Promise<void> {
+    if (!this.sessionSyncPromise) return this.syncSessions();
+    // A connect-time or previous policy sync may still be reading the local
+    // session list. Mark a follow-up so a newer policy cannot be overwritten
+    // by that older snapshot when the browser refreshes immediately.
+    this.sessionSyncAgain = true;
+    const current = this.sessionSyncPromise;
+    return current.then(() => {
+      if (!this.sessionSyncAgain) return;
+      this.sessionSyncAgain = false;
+      return this.syncSessionsNow();
+    });
   }
 
   async requestPairCode() {

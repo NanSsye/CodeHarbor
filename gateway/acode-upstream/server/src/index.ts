@@ -571,7 +571,10 @@ app.patch("/sessions/:id/policy", async (request, reply) => {
     timestamp,
     payload: { sessionId: id, sessionPolicyMode: body.sessionPolicyMode, session }
   });
-  void relayClient.syncSessionsNow();
+  // Wait for the metadata push to be queued after the local snapshot update.
+  // This prevents an immediate browser refresh from reading the previous
+  // policy from the cloud session list while an older sync is still running.
+  await relayClient.syncSessionsNow();
   return { ok: true, session };
 });
 
