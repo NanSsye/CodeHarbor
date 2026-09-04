@@ -2,6 +2,7 @@
 **/node_modules/
 **/runtime/
 **/.tmp-*/
+*.tmp-*.tar.gz
 **/tmp/
 
 # Generated web/server/build output
