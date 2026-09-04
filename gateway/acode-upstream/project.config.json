@@ -1,0 +1,14 @@
+{
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "libVersion": "latest",
+  "miniprogramRoot": "miniprogram/",
+  "projectname": "aCode",
+  "setting": {
+    "checkSiteMap": false,
+    "es6": true,
+    "minified": false,
+    "postcss": true,
+    "urlCheck": false
+  }
+}

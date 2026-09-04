@@ -1,0 +1,13 @@
+node_modules
+server/dist
+server/tsconfig.tsbuildinfo
+app/dist
+app/node_modules
+app/design
+*.log
+.tmp-*
+tmp
+.deploy-backups
+*.jsonl
+*.sqlite*
+*.db

@@ -1,0 +1,68 @@
+{
+  "name": "codeharbor-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CodeHarbor Desktop client for Windows",
+  "main": "electron/main.cjs",
+  "author": "CodeHarbor",
+  "license": "AGPL-3.0",
+  "scripts": {
+    "dev": "electron .",
+    "build:renderer": "npm --prefix ../app run build",
+    "prepare:runtime": "node scripts/prepare-runtime.mjs",
+    "dist": "npm run build:renderer && npm run prepare:runtime && electron-builder --win nsis",
+    "dist:dir": "npm run build:renderer && npm run prepare:runtime && electron-builder --win dir"
+  },
+  "devDependencies": {
+    "electron": "^38.1.0",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "icu.niumac.codeharbor",
+    "productName": "CodeHarbor",
+    "artifactName": "CodeHarbor-Setup-${version}-${arch}.${ext}",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "../server/dist",
+        "to": "gateway/server/dist",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "server-package.json",
+        "to": "gateway/server/package.json"
+      },
+      {
+        "from": "../app/dist",
+        "to": "gateway/app/dist",
+        "filter": ["**/*"]
+      },
+      {
+        "from": "runtime/node",
+        "to": "runtime/node",
+        "filter": ["node.exe", "*.dll", "*.bin"]
+      }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "artifactName": "CodeHarbor-Setup-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CodeHarbor",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    }
+  }
+}

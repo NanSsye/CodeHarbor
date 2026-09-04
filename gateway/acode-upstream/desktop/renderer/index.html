@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CodeHarbor 桌面端</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .card-state{padding:5px 9px;border-radius:999px;background:#eef2f7;color:#7b8899;font-size:11px;font-weight:800;white-space:nowrap}
+      .card-state.connected{background:#e6f7ef;color:#159a68}
+      .card-state.pending{background:#fff7df;color:#ad7a18}
+      .primary.connected{background:#19a974}
+      .primary.connected:hover{background:#12875e}
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-dot">✦</span><span>CODEHARBOR</span></div>
+        <span class="version" id="version">桌面端</span>
+      </header>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">PRIVATE DEVELOPMENT WORKSPACE</p>
+          <h1>把本机 Codex，<em>带到每一块屏幕。</em></h1>
+          <p class="subtitle">桌面端会在本机托管 Gateway，并安全连接你的 CodeHarbor 工作台。</p>
+        </div>
+        <div class="status-card" id="status-card"><span class="status-dot"></span><div><strong id="status-title">正在检查 Gateway</strong><small id="status-detail">首次启动会自动创建本地配置</small></div></div>
+      </section>
+
+      <section class="grid">
+        <form class="card setup-card" id="setup-form">
+          <div class="card-heading"><div><p class="eyebrow">FIRST RUN</p><h2>登录与连接</h2></div><span class="card-state" id="login-state">未连接</span></div>
+          <p class="muted">首次使用请登录或注册云端账号；本机 Gateway 密码只保存在当前电脑。</p>
+          <label>本机 Gateway 账号<input id="username" autocomplete="username" placeholder="请输入本机账号" required /></label>
+          <label>本机 Gateway 密码<input id="password" type="password" autocomplete="new-password" placeholder="至少 16 位" required minlength="16" /></label>
+          <details open><summary>云端账号登录</summary><div class="optional-fields"><label>云端账号<input id="relay-username" autocomplete="username" placeholder="注册后输入云端账号" /></label><label>云端密码<input id="relay-password" type="password" autocomplete="current-password" placeholder="输入云端密码" /></label><button type="button" class="link-button" id="logout-button" hidden>退出云端登录</button></div></details>
+          <button class="primary" type="submit" id="save-button">保存并启动 Gateway</button>
+          <button type="button" class="link-button" id="register-button">没有云端账号？立即注册</button>
+          <p class="error" id="error" role="alert"></p>
+        </form>
+
+        <section class="card checklist-card">
+          <div class="card-heading"><div><p class="eyebrow">LOCAL RUNTIME</p><h2>运行环境</h2></div><span class="step">02</span></div>
+          <div class="check-row"><span class="check-icon" id="codex-check">·</span><div><strong>Codex CLI</strong><small id="codex-detail">等待检测</small></div></div>
+          <div class="check-row"><span class="check-icon" id="home-check">·</span><div><strong>Codex Home</strong><small id="home-detail">等待检测</small></div></div>
+          <div class="check-row"><span class="check-icon" id="port-check">·</span><div><strong>Gateway 端口</strong><small id="port-detail">等待检测</small></div></div>
+          <div class="actions"><button class="secondary" id="workspace-button" disabled>打开工作台</button><button class="ghost" id="restart-button">重启 Gateway</button></div>
+        </section>
+      </section>
+
+      <section class="card log-card">
+        <div class="card-heading"><div><p class="eyebrow">OBSERVABILITY</p><h2>运行日志</h2></div><button class="ghost" id="logs-button">打开日志目录</button></div>
+        <pre id="logs">正在等待 Gateway 输出…</pre>
+      </section>
+      <footer>CodeHarbor Desktop · 配置与日志保存在当前 Windows 用户目录 · <button id="stop-button" class="link-button">停止本机 Gateway</button></footer>
+    </main>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

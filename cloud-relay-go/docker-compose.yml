@@ -1,0 +1,102 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: codeharbor
+      POSTGRES_USER: codeharbor
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      # Keep state beside this compose file by default. Production may set
+      # CODEHARBOR_PERSISTENT_DIR to an existing, explicitly migrated volume.
+      - ${CODEHARBOR_PERSISTENT_DIR:-./persistent}/postgres:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codeharbor -d codeharbor"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - ${CODEHARBOR_PERSISTENT_DIR:-./persistent}/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+  relay:
+    build: .
+    environment:
+      NODE_ENV: production
+      CODEHARBOR_CLOUD_TOKEN: ${CODEHARBOR_CLOUD_TOKEN:?set CODEHARBOR_CLOUD_TOKEN}
+      CODEHARBOR_DEVICE_TOKEN: ${CODEHARBOR_DEVICE_TOKEN:?set CODEHARBOR_DEVICE_TOKEN}
+      CODEHARBOR_ALLOWED_ORIGIN: ${CODEHARBOR_ALLOWED_ORIGIN:?set CODEHARBOR_ALLOWED_ORIGIN}
+      CODEHARBOR_AUTH_SECRET: ${CODEHARBOR_AUTH_SECRET:?set CODEHARBOR_AUTH_SECRET}
+      CODEHARBOR_ADMIN_PASSWORD: ${CODEHARBOR_ADMIN_PASSWORD:?set CODEHARBOR_ADMIN_PASSWORD}
+      CODEHARBOR_TRUST_PROXY: "true"
+      # Current web clients use WebSocket subprotocol auth. Enable only during
+      # an explicitly bounded migration from clients that still use ?token=.
+      CODEHARBOR_ALLOW_QUERY_TOKEN: ${CODEHARBOR_ALLOW_QUERY_TOKEN:-false}
+      # Set false after running schema.sql with a separate migration role.
+      CODEHARBOR_AUTO_MIGRATE: ${CODEHARBOR_AUTO_MIGRATE:-true}
+      # 0 keeps event history indefinitely. Set an explicit positive number
+      # only after defining client cursor/reset behavior for expired history.
+      CODEHARBOR_EVENT_RETENTION_DAYS: ${CODEHARBOR_EVENT_RETENTION_DAYS:-0}
+      # Operators can point the relay at a least-privilege runtime role or an
+      # external managed service without changing the image. The defaults keep
+      # the local Compose stack self-contained for development.
+      DATABASE_URL: ${DATABASE_URL:-postgres://codeharbor:${POSTGRES_PASSWORD}@postgres:5432/codeharbor}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+    ports:
+      - "127.0.0.1:8899:8899"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"
+  web:
+    build:
+      # Build from the Gateway root so the app can use the shared TypeScript
+      # base config without duplicating it into the web project.
+      context: ../gateway/acode-upstream
+      dockerfile: app/Dockerfile
+    ports:
+      # Lucky (the public TLS reverse proxy) reaches the web container through
+      # the host LAN address. Keep the relay itself loopback-only, but expose
+      # this single nginx entrypoint on all host interfaces so the configured
+      # 8900 upstream does not fail with connection refused.
+      - "0.0.0.0:8900:80"
+    depends_on:
+      relay: { condition: service_started }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1/healthz | grep -q 'codeharbor-web'"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"

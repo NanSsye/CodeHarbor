@@ -1,0 +1,7 @@
+.tmp-*
+tmp
+persistent
+*.exe
+codeharbor-relay-linux-amd64
+*.jsonl
+*.log

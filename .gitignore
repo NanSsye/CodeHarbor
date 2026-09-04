@@ -1,0 +1,34 @@
+# Local/runtime dependencies
+**/node_modules/
+**/runtime/
+**/.tmp-*/
+**/tmp/
+
+# Generated web/server/build output
+**/dist/
+**/dist-final*/
+**/dist-next/
+**/tsconfig.tsbuildinfo
+**/*.log
+
+# Local configuration and state
+.env
+.env.*
+!.env.example
+**/cloud-data/
+**/persistent/
+**/gateway-data/
+main.cjs
+documentation/comprehensive-audit-2026-09-04.md
+
+# Native release binaries are published as GitHub Release assets, not source
+cloud-relay-go/*.exe
+cloud-relay-go/codeharbor-relay-linux-amd64*
+cloud-relay-go/.tmp-*
+gateway/acode-upstream/desktop/dist/
+
+# Editor/OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
