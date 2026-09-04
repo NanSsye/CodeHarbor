@@ -1064,12 +1064,17 @@ app.post("/sessions/:id/approvals/:requestId", async (request, reply) => {
   const context = await authorizedThreadContext(id);
   if (!context) return reply.code(404).send({ error: "session_not_found", sessionId: id });
   if (!context.workspacePath) return reply.code(403).send({ error: "forbidden", message: "工作区不在允许访问的范围内" });
+  app.log.info({ threadId: id, requestId, decision: body.decision, hasTurnId: Boolean(body.turnId) }, "approval resolve request received");
   // Approval is irreversible from the Gateway's perspective. Require the
   // audit record before consuming the pending request so a disk failure
   // cannot produce an unaudited Codex decision.
   await audit("approval.resolve", { threadId: id, requestId, decision: body.decision });
   const resolved = codexBridge.resolveApproval(requestId, body.decision, id, body.turnId, body.execpolicyAmendment);
-  if (!resolved) return reply.code(404).send({ error: "approval_not_found" });
+  if (!resolved) {
+    app.log.warn({ threadId: id, requestId, hasTurnId: Boolean(body.turnId) }, "approval resolve rejected: pending request not found or turn mismatch");
+    return reply.code(404).send({ error: "approval_not_found" });
+  }
+  app.log.info({ threadId: id, requestId, decision: body.decision }, "approval resolve accepted");
   const payload = { sessionId: id, requestId, decision: body.decision };
   broadcastGateway({ type: "approval-resolved", sessionId: id, timestamp: new Date().toISOString(), payload });
   return { ok: true, ...payload };
@@ -2240,6 +2245,9 @@ function normalizeCodexEvent(event: CodexEvent) {
     const threadId = typeof record.threadId === "string" ? record.threadId : undefined;
     if (!threadId) return null;
     const nestedParams = record.params && typeof record.params === "object" ? record.params as Record<string, unknown> : {};
+    const turnId = typeof record.turnId === "string"
+      ? record.turnId
+      : typeof nestedParams.turnId === "string" ? nestedParams.turnId : undefined;
     return {
       type: "approval-requested",
       sessionId: threadId,
@@ -2249,12 +2257,12 @@ function normalizeCodexEvent(event: CodexEvent) {
         sessionId: threadId,
         requestId: record.requestId,
         requestMethod: record.requestMethod ?? nestedParams.requestMethod,
-        turnId: nestedParams.turnId,
-        itemId: nestedParams.itemId,
-        summary: nestedParams.summary,
-        command: nestedParams.command,
-        cwd: nestedParams.cwd,
-        proposedExecpolicyAmendment: nestedParams.proposedExecpolicyAmendment,
+        turnId,
+        itemId: record.itemId ?? nestedParams.itemId,
+        summary: record.summary ?? nestedParams.summary,
+        command: record.command ?? nestedParams.command,
+        cwd: record.cwd ?? nestedParams.cwd,
+        proposedExecpolicyAmendment: record.proposedExecpolicyAmendment ?? nestedParams.proposedExecpolicyAmendment,
         expiresAt: record.expiresAt ?? nestedParams.expiresAt,
         params: record.params,
         status: "pending"

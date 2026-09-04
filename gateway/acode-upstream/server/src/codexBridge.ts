@@ -473,11 +473,38 @@ export class CodexBridge extends EventEmitter {
       } else {
       const requestId = String(id);
       const turnId = typeof record.turnId === "string" ? record.turnId : undefined;
+      const itemId = typeof record.itemId === "string" ? record.itemId : undefined;
+      const summary = typeof record.reason === "string"
+        ? record.reason.slice(0, 2000)
+        : typeof record.message === "string" ? record.message.slice(0, 2000) : undefined;
+      const command = typeof record.command === "string" ? record.command.slice(0, 12_000) : undefined;
+      const cwd = typeof record.cwd === "string" ? record.cwd.slice(0, 2_000) : undefined;
+      const proposedExecpolicyAmendment = Array.isArray(record.proposedExecpolicyAmendment)
+        ? record.proposedExecpolicyAmendment
+          .filter((rule): rule is string => typeof rule === "string")
+          .slice(0, 50)
+          .map((rule) => rule.slice(0, 300))
+        : undefined;
       await audit("approval.request", { threadId, requestId, requestMethod: method });
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
       this.emit("event", {
         method: "gateway/codex/approvalRequested",
-        params: { requestId, threadId, turnId, requestMethod: method, expiresAt, params: summarizeParams(params) }
+        params: {
+          requestId,
+          threadId,
+          turnId,
+          requestMethod: method,
+          expiresAt,
+          itemId,
+          summary,
+          command,
+          cwd,
+          proposedExecpolicyAmendment,
+          // Keep the bounded raw summary for diagnostics and compatibility,
+          // while the structured fields above remain usable when the summary
+          // is truncated and therefore no longer valid JSON.
+          params: summarizeParams(params)
+        }
       } satisfies CodexEvent);
       const decision = this.pendingApprovals.size >= maxPendingApprovals
         ? { decision: "deny" as const }

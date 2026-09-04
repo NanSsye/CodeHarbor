@@ -3,13 +3,14 @@ import type { ApprovalRequest } from "../types";
 
 interface ApprovalCardProps {
   approval: ApprovalRequest;
-  onDecision: (requestId: string, decision: "approve" | "deny", amendment?: string[]) => Promise<void>;
+  onDecision: (requestId: string, decision: "approve" | "deny", amendment?: string[], turnId?: string) => Promise<void>;
 }
 
 export const ApprovalCard: React.FC<ApprovalCardProps> = ({ approval, onDecision }) => {
   const [submitting, setSubmitting] = useState(false);
   const [localStatus, setLocalStatus] = useState(approval.status);
   const [remainingSec, setRemainingSec] = useState<number | null>(null);
+  const [actionError, setActionError] = useState("");
 
   useEffect(() => {
     setLocalStatus(approval.status);
@@ -36,14 +37,15 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({ approval, onDecision
   const handleAction = async (decision: "approve" | "deny", withAmendment = false) => {
     if (submitting || localStatus !== "pending") return;
     setSubmitting(true);
+    setActionError("");
     try {
       const amendment = withAmendment
         ? approval.proposedExecpolicyAmendment || (approval.command ? [approval.command] : undefined)
         : undefined;
-      await onDecision(approval.requestId, decision, amendment);
+      await onDecision(approval.requestId, decision, amendment, approval.turnId);
       setLocalStatus(decision === "approve" ? "approved" : "denied");
-    } catch {
-      // Revert if error
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "审批操作失败，请重试");
       setSubmitting(false);
     }
   };
@@ -111,6 +113,7 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({ approval, onDecision
       </div>
 
       {localStatus === "pending" ? (
+        <>
         <div className="approval-actions">
           <button
             className="btn-approval btn-approve"
@@ -142,6 +145,8 @@ export const ApprovalCard: React.FC<ApprovalCardProps> = ({ approval, onDecision
             {submitting ? "处理中..." : "拒绝"}
           </button>
         </div>
+        {actionError && <div className="approval-action-error" role="alert">{actionError}</div>}
+        </>
       ) : (
         <div className="approval-resolved-notice">
           <span>

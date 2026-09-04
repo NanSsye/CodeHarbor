@@ -453,7 +453,18 @@ export function useCodeHarbor() {
               clearTimeout(pending.timer);
               pendingRequests.current.delete(reqId);
               if (msg.status >= 400 || msg.error) {
-                pending.reject(new Error(msg.error || `请求错误 ${msg.status}`));
+                let responseError = "";
+                if (msg.bodyBase64) {
+                  try {
+                    const decoded = JSON.parse(utf8Base64(msg.bodyBase64));
+                    responseError = typeof decoded?.message === "string"
+                      ? decoded.message
+                      : typeof decoded?.error === "string" ? decoded.error : "";
+                  } catch {
+                    // Fall back to the transport status below.
+                  }
+                }
+                pending.reject(new Error(msg.error || responseError || `请求错误 ${msg.status}`));
               } else {
                 let body: any = null;
                 if (pending.raw) {
@@ -887,20 +898,32 @@ export function useCodeHarbor() {
   const sendApprovalDecision = async (
     requestId: string,
     decision: "approve" | "deny",
-    execpolicyAmendment?: string[]
+    execpolicyAmendment?: string[],
+    approvalTurnId?: string
   ) => {
     if (!selectedSessionId) return;
 
     try {
-      const approval = turns.flatMap((turn) => turn.approvals).find((item) => item.requestId === requestId);
+      // App-server request ids are process-local and can restart at "0".
+      // Prefer the turn id carried by the card, then the newest pending
+      // approval, so an old historical card cannot consume the current one.
+      const approval = [...turns].reverse()
+        .flatMap((turn) => [...turn.approvals].reverse())
+        .find((item) => item.requestId === requestId && item.status === "pending")
+        ?? [...turns].reverse()
+          .flatMap((turn) => [...turn.approvals].reverse())
+          .find((item) => item.requestId === requestId);
       await sendGatewayProxy(
         "POST",
         `/sessions/${encodeURIComponent(selectedSessionId)}/approvals/${encodeURIComponent(requestId)}`,
         {
           decision,
           requestId,
-          turnId: approval?.turnId,
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+          turnId: approvalTurnId ?? approval?.turnId,
+          // Send the server-issued deadline. Replacing it with a new client
+          // deadline made a stale approval card look actionable after a
+          // reconnect or Gateway restart.
+          expiresAt: approval?.expiresAt,
           execpolicyAmendment: execpolicyAmendment && execpolicyAmendment.length > 0 ? execpolicyAmendment : undefined
         }
       );
@@ -916,8 +939,11 @@ export function useCodeHarbor() {
       };
       setTurns((prev) => applyLiveEventToTurns(prev, resolvedEvent, selectedSession));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "审批操作失败");
-      throw err;
+      const message = err instanceof Error && err.message === "approval_not_found"
+        ? "该审批已失效，请重新执行该操作"
+        : err instanceof Error ? err.message : "审批操作失败";
+      setError(message);
+      throw new Error(message);
     }
   };
 

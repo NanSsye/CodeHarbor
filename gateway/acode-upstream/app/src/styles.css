@@ -1396,6 +1396,13 @@ button {
   margin-top: 4px;
 }
 
+.approval-action-error {
+  margin-top: 8px;
+  color: var(--color-red);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .btn-approval {
   padding: 8px 18px;
   border-radius: var(--radius-sm);
