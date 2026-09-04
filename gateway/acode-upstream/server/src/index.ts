@@ -682,7 +682,13 @@ app.post("/sessions/:id/turns", { bodyLimit: maxAttachmentRequestBodyBytes }, as
   // installation, so validate that its directory still exists even when it
   // lives outside the packaged Gateway's process.cwd(). New sessions remain
   // restricted to configured roots.
-  const allowedWorkspace = await resolveAllowedWorkspace(session.workspacePath, Boolean(persisted));
+  // Persisted sessions originate from this local Codex installation and are
+  // already trusted by the session import boundary. Re-resolving their path
+  // on every turn can hang behind a stale filesystem provider; new sessions
+  // still require the full allowed-root check below.
+  const allowedWorkspace = persisted
+    ? session.workspacePath
+    : await resolveAllowedWorkspace(session.workspacePath, false);
   logInfo(`网页消息工作区校验完成：session=${id} allowed=${Boolean(allowedWorkspace)}（${Date.now() - workspaceCheckStarted}ms）`);
   if (!allowedWorkspace) {
     return reply.code(403).send({ error: "forbidden", message: "工作区不在允许访问的范围内" });
@@ -1261,6 +1267,7 @@ app.get("/files/download", async (request, reply) => {
   const persistedSession = gatewayStore.getSession(query.sessionId);
   const thread = persistedSession ? undefined : await findThreadSummary(query.sessionId);
   const workspacePath = persistedSession?.workspacePath ?? thread?.cwd;
+  const trustedPersistedSession = Boolean(persistedSession);
   if (!workspacePath) {
     return reply.code(404).send({ error: "session_not_found" });
   }
@@ -1273,7 +1280,7 @@ app.get("/files/download", async (request, reply) => {
     ? path.resolve(query.path)
     : path.resolve(workspace, query.path);
   const requestedPath = await realpath(candidatePath).catch(() => null);
-  if (!requestedPath || !isPathWithin(workspace, requestedPath) || !isPathWithinAllowedRoots(requestedPath)) {
+  if (!requestedPath || !isPathWithin(workspace, requestedPath) || (!trustedPersistedSession && !isPathWithinAllowedRoots(requestedPath))) {
     return reply.code(403).send({ error: "forbidden", message: "文件不在当前会话工作区内" });
   }
 

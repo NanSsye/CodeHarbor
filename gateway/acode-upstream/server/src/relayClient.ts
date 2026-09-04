@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { homedir, hostname } from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
@@ -178,6 +178,10 @@ export class RelayClient extends EventEmitter {
   private started = false;
   private connecting = false;
   private revoked = false;
+  // A stale per-device credential can survive a Relay database restore. Retry
+  // enrollment once per connection cycle, then fall back to normal backoff so
+  // transient network failures cannot rotate credentials indefinitely.
+  private credentialRecoveryAttempted = false;
   private status: RelayStatus = {
     enabled: Boolean(config.relayUrl),
     relayUrl: config.relayUrl,
@@ -321,7 +325,7 @@ export class RelayClient extends EventEmitter {
     return this.enrollmentPromise;
   }
 
-  private async enrollDevice() {
+  private async enrollDevice(allowDeviceRotation = true): Promise<void> {
     const accountToken = await this.authenticateAccount();
     const response = await fetch(relayHttpUrl("/api/v1/devices/enroll"), {
       method: "POST",
@@ -335,7 +339,19 @@ export class RelayClient extends EventEmitter {
       signal: AbortSignal.timeout(20_000)
     });
     const body = await responseBody(response);
-    if (!response.ok) throw responseError(response, body);
+    if (!response.ok) {
+      // A stable machine identity may already belong to another cloud
+      // account (for example after switching accounts on this computer).
+      // Keep the remote device untouched and enroll a new local identity once.
+      if (allowDeviceRotation && response.status === 409 && body.error === "device_owned") {
+        this.identity = { deviceId: randomUUID() };
+        writeIdentity(this.identity);
+        this.status.deviceId = this.identity.deviceId;
+        this.emit("status", this.getStatus());
+        return this.enrollDevice(false);
+      }
+      throw responseError(response, body);
+    }
     const deviceToken = typeof body.deviceToken === "string" ? body.deviceToken : "";
     const deviceId = typeof body.deviceId === "string" ? body.deviceId : this.identity.deviceId;
     if (!deviceToken || !deviceId) throw new Error("relay enrollment returned no device credential");
@@ -411,12 +427,20 @@ export class RelayClient extends EventEmitter {
   private handleRelayDisconnect(socket: WebSocket, code = 1000, reason = "") {
     if (this.relaySocket !== socket) return;
     const handshakeIncomplete = this.relayReadySocket !== socket;
+    let recoverCredential = false;
     if (this.relayHeartbeatTimer) clearInterval(this.relayHeartbeatTimer);
     this.relayHeartbeatTimer = null;
     this.status.connected = false;
     if (handshakeIncomplete) {
       const detail = reason.trim();
       this.status.lastError = `relay device handshake closed (${code}${detail ? `: ${detail}` : ""})`;
+      if (code === 1006 && this.identity.deviceToken && !this.credentialRecoveryAttempted) {
+        this.credentialRecoveryAttempted = true;
+        recoverCredential = true;
+        this.identity = { deviceId: this.identity.deviceId };
+        writeIdentity(this.identity);
+        this.status.lastError = "设备凭据已刷新，正在重新认证";
+      }
     }
     this.relaySocket = null;
     this.relayReadySocket = null;
@@ -430,7 +454,7 @@ export class RelayClient extends EventEmitter {
       this.pending.delete(requestId);
     }
     this.emit("status", this.getStatus());
-    this.scheduleReconnect();
+    this.scheduleReconnect(recoverCredential ? 500 : 3_000);
   }
 
   private scheduleReconnect(delay = 3_000) {
@@ -464,6 +488,7 @@ export class RelayClient extends EventEmitter {
       this.identity = { deviceId, deviceToken, deviceSecret };
       writeIdentity(this.identity);
       this.relayReadySocket = this.relaySocket;
+      this.credentialRecoveryAttempted = false;
       this.status.connected = true;
       this.status.deviceId = deviceId;
       this.status.deviceName = typeof record.deviceName === "string" ? record.deviceName : this.status.deviceName;
