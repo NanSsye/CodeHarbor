@@ -165,6 +165,7 @@ function responseError(response: Response, body: Record<string, unknown>) {
 
 export class RelayClient extends EventEmitter {
   private relaySocket: WebSocket | null = null;
+  private relayReadySocket: WebSocket | null = null;
   private gatewayEventSocket: WebSocket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private relayHeartbeatTimer: NodeJS.Timeout | null = null;
@@ -261,8 +262,9 @@ export class RelayClient extends EventEmitter {
 
     socket.once("open", () => {
       if (this.relaySocket !== socket) return;
-      this.status.connected = true;
-      this.status.lastError = undefined;
+      // Upgrade success is not device authentication. Mark online only after
+      // the relay returns the authenticated device-ready handshake.
+      this.status.connected = false;
       this.emit("status", this.getStatus());
       safeRelaySend(socket, JSON.stringify(this.deviceHello()));
       if (this.relayHeartbeatTimer) clearInterval(this.relayHeartbeatTimer);
@@ -273,7 +275,7 @@ export class RelayClient extends EventEmitter {
     });
 
     socket.on("message", (raw) => this.handleRelayMessage(String(raw)));
-    socket.on("close", () => this.handleRelayDisconnect(socket));
+    socket.on("close", (code, reason) => this.handleRelayDisconnect(socket, code, reason.toString("utf8")));
     socket.on("error", (error) => {
       if (this.relaySocket === socket) this.setError(error);
     });
@@ -406,12 +408,18 @@ export class RelayClient extends EventEmitter {
     });
   }
 
-  private handleRelayDisconnect(socket: WebSocket) {
+  private handleRelayDisconnect(socket: WebSocket, code = 1000, reason = "") {
     if (this.relaySocket !== socket) return;
+    const handshakeIncomplete = this.relayReadySocket !== socket;
     if (this.relayHeartbeatTimer) clearInterval(this.relayHeartbeatTimer);
     this.relayHeartbeatTimer = null;
     this.status.connected = false;
+    if (handshakeIncomplete) {
+      const detail = reason.trim();
+      this.status.lastError = `relay device handshake closed (${code}${detail ? `: ${detail}` : ""})`;
+    }
     this.relaySocket = null;
+    this.relayReadySocket = null;
     if (this.gatewayEventSocket) {
       this.gatewayEventSocket.close();
       this.gatewayEventSocket = null;
@@ -455,6 +463,7 @@ export class RelayClient extends EventEmitter {
       const deviceSecret = typeof record.deviceSecret === "string" ? record.deviceSecret : this.identity.deviceSecret;
       this.identity = { deviceId, deviceToken, deviceSecret };
       writeIdentity(this.identity);
+      this.relayReadySocket = this.relaySocket;
       this.status.connected = true;
       this.status.deviceId = deviceId;
       this.status.deviceName = typeof record.deviceName === "string" ? record.deviceName : this.status.deviceName;

@@ -270,7 +270,7 @@ async function authenticateRelay() {
       await require("electron").session.defaultSession.cookies.set({ url: RELAY_ORIGIN, name: pair[0], value: pair[1], secure: RELAY_ORIGIN.startsWith("https://"), httpOnly: true });
     }
     setRelayLoginState("已登录");
-    appendLog("云端账号已登录，正在打开工作台");
+    appendLog("云端账号已登录，桌面控制台保持打开");
     return true;
   } catch (error) { setRelayLoginState("登录失败", error?.message || "网络错误"); appendLog(`云端登录暂不可用：${error?.message || "网络错误"}`); return false; }
 }
