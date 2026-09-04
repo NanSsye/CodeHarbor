@@ -19,6 +19,7 @@
 **/persistent/
 **/gateway-data/
 main.cjs
+!gateway/acode-upstream/desktop/electron/main.cjs
 documentation/comprehensive-audit-2026-09-04.md
 
 # Native release binaries are published as GitHub Release assets, not source

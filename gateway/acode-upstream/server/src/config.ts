@@ -66,8 +66,9 @@ function required(env: RawEnv, key: string) {
 loadDotenv();
 
 const codexHome = process.env.CODEX_HOME ?? path.join(homedir(), ".codex");
-// No built-in account is safe for a new installation. The desktop client
-// supplies the user's explicit local Gateway username at runtime.
+// No user-facing local account is built in. The desktop client supplies an
+// internal per-installation credential at runtime; cloud account login stays
+// in the Relay layer.
 const gatewayAuthUsername = process.env.GATEWAY_AUTH_USERNAME ?? "";
 const relayAccountToken = process.env.RELAY_ACCOUNT_TOKEN?.trim()
   || process.env.CODEHARBOR_ACCOUNT_TOKEN?.trim()

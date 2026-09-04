@@ -31,10 +31,11 @@
       <section class="grid">
         <form class="card setup-card" id="setup-form">
           <div class="card-heading"><div><p class="eyebrow">FIRST RUN</p><h2>登录与连接</h2></div><span class="card-state" id="login-state">未连接</span></div>
-          <p class="muted">首次使用请登录或注册云端账号；本机 Gateway 密码只保存在当前电脑。</p>
-          <label>本机 Gateway 账号<input id="username" autocomplete="username" placeholder="请输入本机账号" required /></label>
-          <label>本机 Gateway 密码<input id="password" type="password" autocomplete="new-password" placeholder="至少 16 位" required minlength="16" /></label>
-          <details open><summary>云端账号登录</summary><div class="optional-fields"><label>云端账号<input id="relay-username" autocomplete="username" placeholder="注册后输入云端账号" /></label><label>云端密码<input id="relay-password" type="password" autocomplete="current-password" placeholder="输入云端密码" /></label><button type="button" class="link-button" id="logout-button" hidden>退出云端登录</button></div></details>
+          <p class="muted">使用 CodeHarbor 云端账号登录。Gateway 的本机凭据由客户端自动生成并安全保存，无需另行填写。</p>
+          <label>云端账号<input id="relay-username" autocomplete="username" placeholder="输入注册时使用的账号" required /></label>
+          <label>云端密码<input id="relay-password" type="password" autocomplete="current-password" placeholder="输入云端密码" /></label>
+          <p class="saved-hint" id="password-saved-hint" hidden>云端密码已保存；如需更换请输入新密码。</p>
+          <button type="button" class="link-button" id="logout-button" hidden>退出云端登录</button>
           <button class="primary" type="submit" id="save-button">保存并启动 Gateway</button>
           <button type="button" class="link-button" id="register-button">没有云端账号？立即注册</button>
           <p class="error" id="error" role="alert"></p>

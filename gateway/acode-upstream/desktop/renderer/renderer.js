@@ -1,6 +1,7 @@
 const api = window.codeharborDesktop;
 const $ = (id) => document.getElementById(id);
 const logLines = [];
+let relayUsernameDirty = false;
 
 function appendLog(line) {
   if (!line) return;
@@ -43,9 +44,14 @@ function render(state) {
   mark("home-check", state.checks?.codexHome?.ok, state.checks?.codexHome?.detail || "未检测");
   mark("port-check", state.gateway?.running, state.gateway?.running ? `127.0.0.1:${state.gateway.port}` : "等待启动");
   if (state.settings) {
-    $("username").value = state.settings.username || "";
-    $("relay-username").value = state.settings.relayUsername || "";
+    if (!relayUsernameDirty && document.activeElement !== $("relay-username")) {
+      $("relay-username").value = state.settings.relayUsername || "";
+    }
     $("logout-button").hidden = !state.settings.relayUsername;
+    $("password-saved-hint").hidden = !state.settings.relayPasswordSaved;
+    if (state.settings.relayPasswordSaved && !$("relay-password").value) {
+      $("relay-password").placeholder = "已保存云端密码；留空保持不变";
+    }
   }
   if (Array.isArray(state.logs)) $("logs").textContent = state.logs.join("\n");
 }
@@ -53,13 +59,16 @@ function render(state) {
 $("setup-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = $("save-button");
-  const password = $("password").value;
-  if (password.length < 16) { $("error").textContent = "工作台密码至少需要 16 位。"; return; }
-  button.disabled = true; button.textContent = "保存中…"; $("error").textContent = "";
+  const username = $("relay-username").value.trim();
+  const password = $("relay-password").value;
+  const hasSavedPassword = !$("password-saved-hint").hidden;
+  $("error").textContent = "";
+  if (!username) { $("error").textContent = "请输入云端账号。"; return; }
+  if (!password && !hasSavedPassword) { $("error").textContent = "请输入云端密码。"; return; }
+  button.disabled = true; button.textContent = "保存中…";
   try {
-    const username = $("username").value.trim();
-    if (!username) { $("error").textContent = "请输入本机 Gateway 账号。"; return; }
-    const result = await api.saveSettings({ username, password, relayUsername: $("relay-username").value.trim(), relayPassword: $("relay-password").value });
+    const result = await api.saveSettings({ relayUsername: username, relayPassword: password });
+    relayUsernameDirty = false;
     render(result);
   } catch (error) { $("error").textContent = error?.message || "保存失败"; }
   button.disabled = false;
@@ -68,9 +77,12 @@ $("setup-form").addEventListener("submit", async (event) => {
 
 $("workspace-button").addEventListener("click", () => api.openWorkspace());
 $("register-button").addEventListener("click", () => api.openRegister());
+$("relay-username").addEventListener("input", () => { relayUsernameDirty = true; });
 $("logout-button").addEventListener("click", async () => {
   const result = await api.logoutRelay();
+  relayUsernameDirty = false;
   render(result);
+  $("relay-username").value = "";
   $("relay-password").value = "";
 });
 $("restart-button").addEventListener("click", async () => { appendLog("正在重启 Gateway…"); render(await api.restartGateway()); });

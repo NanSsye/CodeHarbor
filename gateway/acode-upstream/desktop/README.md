@@ -1,6 +1,6 @@
 # CodeHarbor Desktop
 
-桌面端是一个 Windows Electron 安装包。它负责托管本机 Gateway、保存本机连接配置并提供日志/运行状态控制台，聊天工作台仍然使用 CodeHarbor 的 HTTPS/WSS 云端页面。
+桌面端是一个 Windows Electron 安装包。它负责托管本机 Gateway，并提供日志/运行状态控制台；用户只需使用 CodeHarbor 云端账号登录，聊天工作台仍然使用 CodeHarbor 的 HTTPS/WSS 云端页面。
 
 ## 开发运行
 
@@ -13,7 +13,7 @@ npm run app:build
 npm --prefix desktop run dev
 ```
 
-首次运行在桌面控制台设置工作台密码（至少 16 位），可选填写 Relay 账号密码。凭据通过 Electron `safeStorage` 加密后保存到 `%APPDATA%/CodeHarbor`，不会写入 URL 或网页 localStorage。
+首次运行在桌面控制台输入注册时使用的云端账号和密码，也可从控制台打开注册页面。本机 Gateway 的认证密钥由客户端自动生成；云端密码和内部密钥通过 Electron `safeStorage` 加密后保存到 `%APPDATA%/CodeHarbor`，不会写入 URL 或网页 localStorage。
 
 ## 生成安装包
 
